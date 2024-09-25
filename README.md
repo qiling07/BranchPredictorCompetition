@@ -105,7 +105,7 @@ This is extra points. You will be implementing the Tournament Predictor populari
 
 #### Custom
 
-This is extra points, and gets you in the compatition. You now have the opportunity to be creative and design your own predictor. You can use an already implemented predictor with set values if you believe it can compete.The only requirement is that the total size of your custom predictor must not exceed (64K + 256) bits (not bytes) of stored data and that your custom predictor must outperform both the Gshare and Tournament predictors (details below).
+This is extra points, and gets you in the compatition. You now have the opportunity to be creative and design your own predictor. You can use an already implemented predictor with set values if you believe it can compete. The only requirement is that the total size of your custom predictor must not exceed (64K + 256) bits (not bytes) of stored data. You will need to write a documentation and explain your approach, and the reasoning behind the optimizations. Simulating and picking the best is also a way to reason but show us how a change helps by graphing in that case.
 
 #### Things to note
 
@@ -129,9 +129,7 @@ They should also have the following state transitions:
 The Choice Predictor used to select which predictor to use in the Alpha 21264 Tournament predictor should be initialized to Weakly select the Global Predictor.
 
 ## Grading
-To be updated.
-
-#### Grading the custom predictor
+Each Category of predictor gets 10 points. The best custom predictor gets 50, second 40, third 30, fourth 20, and fifth 10. You only get the extra points if you write the documentation mentioned in [Custom](#custom).
 
 
 ## Turn-in instructions
