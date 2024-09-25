@@ -20,11 +20,12 @@ const char *email       = "EMAIL";
 //------------------------------------//
 
 // Handy Global for use in output routines
-const char *bpName[4] = { "Static", "Gshare",
-                          "Tournament", "Custom" };
+const char *bpName[5] = { "Static", "Gshare",
+                          "Tournament", "Custom", "Bimodal" };
 
 int ghistoryBits; // Number of bits used for Global History
 int lhistoryBits; // Number of bits used for Local History
+int bhistoryBits; // Number of bits used for Bimodal History
 int pcIndexBits;  // Number of bits used for PC index
 int bpType;       // Branch Prediction Type
 int verbose;
@@ -50,6 +51,15 @@ init_predictor()
   //
   //TODO: Initialize Branch Predictor Data Structures
   //
+  switch (bpType) {
+    case STATIC:
+    case BIMODAL:
+    case GSHARE:
+    case TOURNAMENT:
+    case CUSTOM:
+    default:
+      break;
+  }
 }
 
 // Make a prediction for conditional branch instruction at PC 'pc'
@@ -67,6 +77,7 @@ make_prediction(uint32_t pc)
   switch (bpType) {
     case STATIC:
       return TAKEN;
+    case BIMODAL:
     case GSHARE:
     case TOURNAMENT:
     case CUSTOM:

@@ -1,5 +1,5 @@
 //========================================================//
-//  CSE 240a Branch Lab                                   //
+//  Branch Lab                                   //
 //                                                        //
 //  Students need to implement various Branch Predictors  //
 //========================================================//
@@ -26,6 +26,7 @@ usage()
   fprintf(stderr," --verbose    Print predictions on stdout\n");
   fprintf(stderr," --<type>     Branch prediction scheme:\n");
   fprintf(stderr,"    static\n"
+                 "    bimodal\n"
                  "    gshare:<# ghistory>\n"
                  "    tournament:<# ghistory>:<# lhistory>:<# index>\n"
                  "    custom\n");
@@ -41,6 +42,8 @@ handle_option(char *arg)
 {
   if (!strcmp(arg,"--static")) {
     bpType = STATIC;
+  } else if (!strncmp(arg,"--bimodal",9)) {
+    bpType = BIMODAL;
   } else if (!strncmp(arg,"--gshare:",9)) {
     bpType = GSHARE;
     sscanf(arg+9,"%d", &ghistoryBits);
