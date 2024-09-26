@@ -33,7 +33,7 @@ SD R9, 2000(R5)
 SUBI R11, R11, 1
 BG R11,R10, LOOP // Greater
 ```
-Draw pipeline diagram for a 5 stage pipeline and show how many cycles it takes to execute the loop. Assume we have all the forwarding available. Show the exact forwarding arrows in your diagrams like what we did in the class. Assume we have an ISA with one branch delay slot. What is the CPI for this code? If you make any assumptions state them clearly.
+Draw pipeline diagram for a 5 stage pipeline for the first iteration of the loop and show how many cycles it takes to execute the loop. Assume we have all the forwarding available. Show the exact forwarding arrows in your diagrams like what we did in the class. Assume we have an ISA with one branch delay slot. What is the CPI for this code? If you make any assumptions state them clearly.
 
 ## Running your predictor
 
