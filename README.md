@@ -19,7 +19,7 @@
 ```
 XOR R10, R10
 XOR R11, R11 // zero out register
-ADDI R11, R11, 1000 
+ADDI R11, R11, 16000
 LOOP:
 DADD R1, R2, R3
 SD R1, 1000(R2)
@@ -31,9 +31,9 @@ DADD R6, R6, R3
 LD R9, 1000(R6)
 SD R9, 2000(R5)
 SUBI R11, R11, 1
-BG R11,R10, LOOP
+BG R11,R10, LOOP // Greater
 ```
-Draw pipeline diagram for a 5 stage pipeline and show how many cycles it takes to execute this code. Assume we have all the forwarding available. Show the exact forwarding arrows in your diagrams like what we did in the class. Assume we have an ISA with one branch delay slot. What is the CPI for this code?
+Draw pipeline diagram for a 5 stage pipeline and show how many cycles it takes to execute the loop. Assume we have all the forwarding available. Show the exact forwarding arrows in your diagrams like what we did in the class. Assume we have an ISA with one branch delay slot. What is the CPI for this code? If you make any assumptions state them clearly.
 
 ## Running your predictor
 
