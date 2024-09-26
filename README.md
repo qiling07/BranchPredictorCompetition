@@ -1,6 +1,7 @@
 # Branch Predictor Project
 
 ## Table of Contents
+  * [Pipeline Question](#pipeline-question)
   * [Running your predictor](#running-your-predictor)
   * [Traces](#traces)
   * [Implementing the predictors](#implementing-the-predictors)
@@ -13,6 +14,26 @@
     - [Grading the custom predictor](#grading-the-custom-predictor)
   * [Turn-in Instructions](#turn-in-instructions)
 
+## Pipeline Question
+
+```
+XOR R10, R10
+XOR R11, R11 // zero out register
+ADDI R11, R11, 1000 
+LOOP:
+DADD R1, R2, R3
+SD R1, 1000(R2)
+LD R7, 2000(R2)
+DADD R5, R7, R1
+LD R6, 1000(R5)
+SD R8, 2000(R6)
+DADD R6, R6, R3
+LD R9, 1000(R6)
+SD R9, 2000(R5)
+SUBI R11, R11, 1
+BG R11,R10, LOOP
+```
+Draw pipeline diagram for a 5 stage pipeline and show how many cycles it takes to execute this code. Assume we have all the forwarding available. Show the exact forwarding arrows in your diagrams like what we did in the class. Assume we have an ISA with one branch delay slot. What is the CPI for this code?
 
 ## Running your predictor
 
@@ -133,4 +154,4 @@ Each Category of predictor gets 10 points. The best custom predictor gets 50, se
 
 
 ## Turn-in instructions
-
+Due date is October 10, 11:59 pm. There will be a Brightspace submission page for the assignment.
