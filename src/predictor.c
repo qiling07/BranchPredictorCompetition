@@ -36,9 +36,6 @@ int verbose;
 //      Predictor Data Structures     //
 //------------------------------------//
 
-//
-//TODO: Add your own Branch Predictor data structures here
-//
 #define false 0
 #define true 1
 #define ST 3 // Strongly Taken (11)
@@ -89,7 +86,8 @@ train_bimodal(uint32_t pc, uint8_t outcome)
     }
 }
 
-void cleanup_bimodal()
+void
+cleanup_bimodal()
 {
     assert(bht_bimodal != NULL);
     free(bht_bimodal);
@@ -149,11 +147,127 @@ train_gshare(uint32_t pc, uint8_t outcome)
     ghr_gshare = ((ghr_gshare << 1) | outcome) & ((1 << ghistoryBits) - 1);  // Keep only ghistoryBits bits
 }
 
-void cleanup_gshare()
+void
+cleanup_gshare()
 {
     assert(bht_gshare != NULL);
     free(bht_gshare);
     bht_gshare = NULL;
+}
+
+// tournament branch predictor with 2-bit saturation counters
+uint8_t *global_pht_tournament;  // Global Pattern History Table (PHT) for tournament
+uint8_t *local_pht_tournament;   // Local Pattern History Table (PHT) for tournament
+uint32_t *lht_tournament;        // Local History Table (LHT) for tournament
+uint8_t *choice_pht_tournament;  // Choice predictor to choose between global and local
+uint32_t ghr_tournament;         // Global History Register for tournament
+
+// Sizes for the tables
+uint32_t global_pht_size_tournament;
+uint32_t local_pht_size_tournament;
+uint32_t lht_size_tournament;
+uint32_t choice_pht_size_tournament;
+
+void
+init_tournament()
+{
+    // Initialize sizes for the tables based on the configuration parameters
+    global_pht_size_tournament = 1 << ghistoryBits;
+    local_pht_size_tournament = 1 << lhistoryBits;
+    lht_size_tournament = 1 << pcIndexBits;
+    choice_pht_size_tournament = 1 << ghistoryBits;
+
+    // Allocate memory for the tables
+    global_pht_tournament = (uint8_t *)malloc(global_pht_size_tournament * sizeof(uint8_t));
+    local_pht_tournament = (uint8_t *)malloc(local_pht_size_tournament * sizeof(uint8_t));
+    lht_tournament = (uint32_t *)malloc(lht_size_tournament * sizeof(uint32_t));
+    choice_pht_tournament = (uint8_t *)malloc(choice_pht_size_tournament * sizeof(uint8_t));
+
+    // Initialize all entries in the tables to their default states
+    for (uint32_t i = 0; i < global_pht_size_tournament; i++) {
+        global_pht_tournament[i] = WN; // Weakly Not Taken
+    }
+    for (uint32_t i = 0; i < local_pht_size_tournament; i++) {
+        local_pht_tournament[i] = WN; // Weakly Not Taken
+    }
+    for (uint32_t i = 0; i < lht_size_tournament; i++) {
+        lht_tournament[i] = 0; // Initialize local history to zero
+    }
+    for (uint32_t i = 0; i < choice_pht_size_tournament; i++) {
+        choice_pht_tournament[i] = WN; // Weakly favor global predictor initially
+    }
+
+    // Initialize the global history register to zero
+    ghr_tournament = 0;
+
+}
+
+uint8_t
+predict_tournament(uint32_t pc)
+{
+    // Index into the local history table using the PC
+    uint32_t local_history_index = pc & (lht_size_tournament - 1);
+    uint32_t local_history = lht_tournament[local_history_index];
+    uint32_t local_pht_index = local_history & (local_pht_size_tournament - 1);
+
+    // Index into the global PHT and choice PHT using the global history register
+    uint32_t global_pht_index = ghr_tournament & (global_pht_size_tournament - 1);
+    uint32_t choice_index = ghr_tournament & (choice_pht_size_tournament - 1);
+
+    // Get predictions from the local, global, and choice predictors
+    uint8_t local_prediction = (local_pht_tournament[local_pht_index] >= WT) ? 1 : 0;
+    uint8_t global_prediction = (global_pht_tournament[global_pht_index] >= WT) ? 1 : 0;
+    uint8_t choice = choice_pht_tournament[choice_index];
+
+    // Use the choice predictor to select between local and global predictions
+    return (choice >= WT) ? local_prediction : global_prediction;
+}
+
+void
+train_tournament(uint32_t pc, uint8_t outcome)
+{
+    // Update indices for local and global predictors
+    uint32_t local_history_index = pc & (lht_size_tournament - 1);
+    uint32_t local_history = lht_tournament[local_history_index];
+    uint32_t local_pht_index = local_history & (local_pht_size_tournament - 1);
+
+    uint32_t global_pht_index = ghr_tournament & (global_pht_size_tournament - 1);
+    uint32_t choice_index = ghr_tournament & (choice_pht_size_tournament - 1);
+
+    // Get current predictions
+    uint8_t local_prediction = (local_pht_tournament[local_pht_index] >= WT) ? 1 : 0;
+    uint8_t global_prediction = (global_pht_tournament[global_pht_index] >= WT) ? 1 : 0;
+
+    // Update the choice predictor based on which prediction was correct
+    if (local_prediction != global_prediction) {
+        if (global_prediction == outcome) {
+            if (choice_pht_tournament[choice_index] > SN) choice_pht_tournament[choice_index]--;
+        } else {
+            if (choice_pht_tournament[choice_index] < ST) choice_pht_tournament[choice_index]++;
+        }
+    }
+
+    // Update the local and global PHTs with the actual outcome
+    if (outcome == 1) { // Branch taken
+        if (local_pht_tournament[local_pht_index] < ST) local_pht_tournament[local_pht_index]++;
+        if (global_pht_tournament[global_pht_index] < ST) global_pht_tournament[global_pht_index]++;
+    } else { // Branch not taken
+        if (local_pht_tournament[local_pht_index] > SN) local_pht_tournament[local_pht_index]--;
+        if (global_pht_tournament[global_pht_index] > SN) global_pht_tournament[global_pht_index]--;
+    }
+
+    // Update the local history table and the global history register
+    lht_tournament[local_history_index] = ((local_history << 1) | outcome) & ((1 << lhistoryBits) - 1);
+    ghr_tournament = ((ghr_tournament << 1) | outcome) & ((1 << ghistoryBits) - 1);
+}
+
+void
+cleanup_tournament()
+{
+    free(global_pht_tournament);
+    free(local_pht_tournament);
+    free(lht_tournament);
+    free(choice_pht_tournament);
 }
 
 
@@ -180,6 +294,8 @@ init_predictor()
 	    init_gshare();
 	    break;
     case TOURNAMENT:
+	    init_tournament();
+	    break;
     case CUSTOM:
     default:
 	    assert(false && "Not implemented");
@@ -206,6 +322,7 @@ make_prediction(uint32_t pc)
     case GSHARE:
       return predict_gshare(pc);
     case TOURNAMENT:
+      return predict_tournament(pc);
     case CUSTOM:
     default:
 	    assert(false && "Not implemented");
@@ -235,6 +352,8 @@ train_predictor(uint32_t pc, uint8_t outcome)
       train_gshare(pc, outcome);
       break;
     case TOURNAMENT:
+      train_tournament(pc, outcome);
+      break;
     case CUSTOM:
     default:
 	    assert(false && "Not implemented");
@@ -254,6 +373,8 @@ cleanup_predictor()
       cleanup_gshare();
       break;
     case TOURNAMENT:
+      cleanup_tournament();
+      break;
     case CUSTOM:
     default:
 	    assert(false && "Not implemented");

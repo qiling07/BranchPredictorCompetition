@@ -12,7 +12,7 @@ PREDICTOR="./predictor"
 
 # Start and end values for history lengths
 START_HISTORY=5
-END_HISTORY=20
+END_HISTORY=5
 
 # Output file to store the results
 OUTPUT_FILE="test_results.csv"
@@ -32,7 +32,8 @@ do
         echo "Testing $TESTCASE with --gshare:$historyLen ..."
         
         # Run the predictor command and extract the misprediction rate
-        misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --gshare:$historyLen | grep "Misprediction Rate" | awk '{print $3}')
+        # misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --gshare:$historyLen | grep "Misprediction Rate" | awk '{print $3}')
+        misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --tournament:12:10:10 | grep "Misprediction Rate" | awk '{print $3}')
         
         # Print the result to the console
         echo "Trace: $TESTCASE, History Bits: $historyLen, Misprediction Rate: $misp_rate%"

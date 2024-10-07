@@ -160,3 +160,4 @@ Due date is October 10, 11:59 pm. There will be a Brightspace submission page fo
 ## Results
 bimodal: 12/14
 gshare: 17/18
+tournament: 12:10:10

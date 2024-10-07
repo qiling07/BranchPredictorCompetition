@@ -1,0 +1,7 @@
+TESTCASE,history_bits,misp_rate
+fp_1.bz2,5,0.991
+fp_2.bz2,5,3.179
+int_1.bz2,5,10.338
+int_2.bz2,5,0.382
+mm_1.bz2,5,1.694
+mm_2.bz2,5,7.742
