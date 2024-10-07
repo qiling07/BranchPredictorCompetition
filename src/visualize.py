@@ -1,8 +1,12 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import sys
+import os
 
+assert(len(sys.argv) == 2)
+filename = sys.argv[1]
 # Load the full data from the provided CSV file
-data = pd.read_csv('bimodal_test_results.csv')
+data = pd.read_csv(filename)
 
 # Plot the misprediction rates for different history lengths for each testcase
 plt.figure(figsize=(12, 8))
@@ -21,5 +25,6 @@ plt.grid(True)
 
 # Display the plot
 plt.tight_layout()
-plt.savefig("bimodal_test_results.png", dpi=400)
+new_filename = os.path.splitext(filename)[0] + '.png'
+plt.savefig(new_filename, dpi=400)
 

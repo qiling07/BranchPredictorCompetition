@@ -155,3 +155,8 @@ Each Category of predictor gets 10 points. The best custom predictor gets 50, se
 
 ## Turn-in instructions
 Due date is October 10, 11:59 pm. There will be a Brightspace submission page for the assignment.
+
+
+## Results
+bimodal: 12/14
+gshare: 17/18

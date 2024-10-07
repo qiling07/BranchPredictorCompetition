@@ -10,12 +10,12 @@ fi
 TRACE_DIR="$1"
 PREDICTOR="./predictor"
 
-# Start and end values for bimodal history lengths
+# Start and end values for history lengths
 START_HISTORY=5
 END_HISTORY=20
 
 # Output file to store the results
-OUTPUT_FILE="bimodal_test_results.csv"
+OUTPUT_FILE="test_results.csv"
 
 # Clear the output file if it exists and add the header
 > "$OUTPUT_FILE"
@@ -26,13 +26,13 @@ for TRACE_FILE in "$TRACE_DIR"/*.bz2
 do
     TESTCASE=$(basename "$TRACE_FILE")
     
-    # Loop through the specified range of bimodal history lengths
+    # Loop through the specified range of history lengths
     for ((historyLen=$START_HISTORY; historyLen<=$END_HISTORY; historyLen++))
     do
-        echo "Testing $TESTCASE with --bimodal:$historyLen ..."
+        echo "Testing $TESTCASE with --gshare:$historyLen ..."
         
         # Run the predictor command and extract the misprediction rate
-        misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --bimodal:$historyLen | grep "Misprediction Rate" | awk '{print $3}')
+        misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --gshare:$historyLen | grep "Misprediction Rate" | awk '{print $3}')
         
         # Print the result to the console
         echo "Trace: $TESTCASE, History Bits: $historyLen, Misprediction Rate: $misp_rate%"
