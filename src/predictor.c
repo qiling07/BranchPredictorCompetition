@@ -10,9 +10,6 @@
 #include <stdlib.h>
 #include "predictor.h"
 
-//
-// TODO:Student Information
-//
 const char *studentName = "Qi Ling";
 const char *studentID   = "037771523";
 const char *email       = "ling102@purdue.edu";
@@ -270,7 +267,203 @@ cleanup_tournament()
     free(choice_pht_tournament);
 }
 
+// Custom TAGE predictor
+int ghistoryBits_tage;    // Number of bits for global history
+int num_tables_tage;      // Number of tagged tables
+int base_predictor_size;  // Size of the base predictor
 
+uint8_t *base_predictor_tage;     // Base predictor (bimodal)
+uint8_t **tage_tables;            // Tagged predictor tables (multiple)
+uint32_t *table_tags;             // Tags associated with each entry in the tagged tables
+uint32_t ghr_tage;                // Global History Register for TAGE predictor
+int *history_lengths;             // Array of history lengths for each table
+int tage_table_sizes;             // Size of each TAGE table
+
+void init_tage()
+{
+    ghistoryBits_tage = 32;
+    num_tables_tage = 8;
+
+    // Allocate memory for the base predictor (bimodal) with 2-bit counters
+    base_predictor_size = 1 << ghistoryBits_tage;
+    base_predictor_tage = (uint8_t *)malloc(base_predictor_size * sizeof(uint8_t));
+    for (uint32_t i = 0; i < base_predictor_size; i++) {
+        base_predictor_tage[i] = WN; // Weakly Not Taken
+    }
+
+    // Initialize the number of tables and each table's size
+    tage_table_sizes = 1 << ghistoryBits_tage;
+    tage_tables = (uint8_t **)malloc(num_tables_tage * sizeof(uint8_t *));
+    table_tags = (uint32_t *)malloc(num_tables_tage * tage_table_sizes * sizeof(uint32_t));
+    history_lengths = (int *)malloc(num_tables_tage * sizeof(int));
+
+    // Set up each tagged table with its own 2-bit counters and tags
+    for (int i = 0; i < num_tables_tage; i++) {
+        tage_tables[i] = (uint8_t *)malloc(tage_table_sizes * sizeof(uint8_t));
+        history_lengths[i] = 1 << (i + 2);  // Geometrically increasing history lengths
+
+        for (uint32_t j = 0; j < tage_table_sizes; j++) {
+            tage_tables[i][j] = WN; // Weakly Not Taken
+            table_tags[i * tage_table_sizes + j] = 0; // Initialize tags to 0
+        }
+    }
+
+    // Initialize the Global History Register (GHR) for TAGE predictor
+    ghr_tage = 0;
+}
+
+uint8_t predict_tage(uint32_t pc)
+{
+    uint8_t prediction = (base_predictor_tage[pc % base_predictor_size] >= WT) ? 1 : 0;
+
+    // Iterate through tagged tables to find the longest matching history
+    for (int i = num_tables_tage - 1; i >= 0; i--) {
+        uint32_t index = (pc ^ (ghr_tage & ((1 << history_lengths[i]) - 1))) % tage_table_sizes;
+        uint32_t tag = table_tags[i * tage_table_sizes + index];
+
+        // If a matching tag is found, use the tagged table's prediction
+        if (tag == (pc % tage_table_sizes)) {
+            prediction = (tage_tables[i][index] >= WT) ? 1 : 0;
+            break; // Use the longest matching history table
+        }
+    }
+
+    return prediction;
+}
+
+void train_tage(uint32_t pc, uint8_t outcome)
+{
+    int longest_match = -1;
+    uint8_t base_prediction = (base_predictor_tage[pc % base_predictor_size] >= WT) ? 1 : 0;
+
+    // Find the longest matching history in the tagged tables
+    for (int i = num_tables_tage - 1; i >= 0; i--) {
+        uint32_t index = (pc ^ (ghr_tage & ((1 << history_lengths[i]) - 1))) % tage_table_sizes;
+        uint32_t tag = table_tags[i * tage_table_sizes + index];
+
+        if (tag == (pc % tage_table_sizes)) {
+            longest_match = i;
+            break;
+        }
+    }
+
+    // Update the tagged table with the longest matching history if a match was found
+    if (longest_match != -1) {
+        uint32_t index = (pc ^ (ghr_tage & ((1 << history_lengths[longest_match]) - 1))) % tage_table_sizes;
+        if (outcome == 1) {
+            if (tage_tables[longest_match][index] < ST) tage_tables[longest_match][index]++;
+        } else {
+            if (tage_tables[longest_match][index] > SN) tage_tables[longest_match][index]--;
+        }
+    } else {
+        // If no match was found, update the base predictor instead
+        uint32_t base_index = pc % base_predictor_size;
+        if (outcome == 1) {
+            if (base_predictor_tage[base_index] < ST) base_predictor_tage[base_index]++;
+        } else {
+            if (base_predictor_tage[base_index] > SN) base_predictor_tage[base_index]--;
+        }
+    }
+
+    // Update the Global History Register (GHR) with the actual outcome
+    ghr_tage = ((ghr_tage << 1) | outcome) & ((1 << ghistoryBits_tage) - 1);
+}
+
+void cleanup_tage()
+{
+    free(base_predictor_tage);
+    for (int i = 0; i < num_tables_tage; i++) {
+        free(tage_tables[i]);
+    }
+    free(tage_tables);
+    free(table_tags);
+    free(history_lengths);
+}
+
+
+// Custom TAGE predictor
+int ghistoryBits_perceptron;   // Number of bits for global history
+int num_perceptrons;           // Number of perceptrons in the table
+int perceptron_threshold;      // Threshold for training the perceptrons
+
+// Components of the Perceptron Branch Predictor
+int8_t **perceptron_table;     // Table of perceptrons (weights)
+uint32_t ghr_perceptron;       // Global History Register for perceptron predictor
+
+// Initialize the Perceptron Branch Predictor
+void init_perceptron()
+{
+    ghistoryBits_perceptron = 58;
+    num_perceptrons = 1<<12;
+    perceptron_threshold = 70;
+
+    // Allocate memory for the perceptron table
+    perceptron_table = (int8_t **)malloc(num_perceptrons * sizeof(int8_t *));
+    for (int i = 0; i < num_perceptrons; i++) {
+        perceptron_table[i] = (int8_t *)malloc((ghistoryBits_perceptron + 1) * sizeof(int8_t));
+        for (int j = 0; j <= ghistoryBits_perceptron; j++) {
+            perceptron_table[i][j] = 0; // Initialize all weights to 0
+        }
+    }
+
+    // Initialize the Global History Register to zero
+    ghr_perceptron = 0;
+}
+
+// Predict the outcome of a branch using the Perceptron Branch Predictor
+uint8_t predict_perceptron(uint32_t pc)
+{
+    int perceptron_index = pc % num_perceptrons;  // Select a perceptron based on the PC
+    int8_t *weights = perceptron_table[perceptron_index];
+
+    // Compute the dot product of the weights and the global history
+    int y = weights[0];  // Bias term
+    for (int i = 0; i < ghistoryBits_perceptron; i++) {
+        int history_bit = (ghr_perceptron >> i) & 1;
+        y += weights[i + 1] * (history_bit ? 1 : -1);
+    }
+
+    // Predict taken if y > 0, not taken otherwise
+    return (y >= 0) ? 1 : 0;
+}
+
+// Train the Perceptron Branch Predictor based on the actual outcome
+void train_perceptron(uint32_t pc, uint8_t outcome)
+{
+    int perceptron_index = pc % num_perceptrons;  // Select a perceptron based on the PC
+    int8_t *weights = perceptron_table[perceptron_index];
+
+    // Compute the dot product of the weights and the global history to get y
+    int y = weights[0];  // Bias term
+    for (int i = 0; i < ghistoryBits_perceptron; i++) {
+        int history_bit = (ghr_perceptron >> i) & 1;
+        y += weights[i + 1] * (history_bit ? 1 : -1);
+    }
+
+    // Convert the branch outcome to +1 for taken and -1 for not taken
+    int actual = outcome ? 1 : -1;
+
+    // Update weights if the prediction was incorrect or |y| <= threshold
+    if ((y >= 0) != (actual == 1) || abs(y) <= perceptron_threshold) {
+        weights[0] += actual;  // Update the bias term
+        for (int i = 0; i < ghistoryBits_perceptron; i++) {
+            int history_bit = (ghr_perceptron >> i) & 1;
+            weights[i + 1] += actual * (history_bit ? 1 : -1);
+        }
+    }
+
+    // Update the Global History Register with the actual outcome
+    ghr_perceptron = ((ghr_perceptron << 1) | outcome) & ((1 << ghistoryBits_perceptron) - 1);
+}
+
+// Free the allocated memory for the Perceptron Branch Predictor
+void cleanup_perceptron()
+{
+    for (int i = 0; i < num_perceptrons; i++) {
+        free(perceptron_table[i]);
+    }
+    free(perceptron_table);
+}
 
 //------------------------------------//
 //        Predictor Functions         //
@@ -281,9 +474,6 @@ cleanup_tournament()
 void
 init_predictor()
 {
-  //
-  //TODO: Initialize Branch Predictor Data Structures
-  //
   switch (bpType) {
     case STATIC:
 	    break;
@@ -297,6 +487,9 @@ init_predictor()
 	    init_tournament();
 	    break;
     case CUSTOM:
+	    // init_tage();
+	    init_perceptron();
+	    break;
     default:
 	    assert(false && "Not implemented");
   }
@@ -309,10 +502,6 @@ init_predictor()
 uint8_t
 make_prediction(uint32_t pc)
 {
-  //
-  //TODO: Implement prediction scheme
-  //
-
   // Make a prediction based on the bpType
   switch (bpType) {
     case STATIC:
@@ -324,6 +513,8 @@ make_prediction(uint32_t pc)
     case TOURNAMENT:
       return predict_tournament(pc);
     case CUSTOM:
+      // return predict_tage(pc);
+      return predict_perceptron(pc);
     default:
 	    assert(false && "Not implemented");
   }
@@ -339,9 +530,6 @@ make_prediction(uint32_t pc)
 void
 train_predictor(uint32_t pc, uint8_t outcome)
 {
-  //
-  //TODO: Implement Predictor training
-  //
   switch (bpType) {
     case STATIC:
       break;
@@ -355,6 +543,9 @@ train_predictor(uint32_t pc, uint8_t outcome)
       train_tournament(pc, outcome);
       break;
     case CUSTOM:
+      // train_tage(pc, outcome);
+      train_perceptron(pc, outcome);
+      break;
     default:
 	    assert(false && "Not implemented");
   }
@@ -376,6 +567,9 @@ cleanup_predictor()
       cleanup_tournament();
       break;
     case CUSTOM:
+      // cleanup_tage();
+      cleanup_perceptron();
+      break;
     default:
 	    assert(false && "Not implemented");
   }
