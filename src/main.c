@@ -44,6 +44,9 @@ handle_option(char *arg)
     bpType = STATIC;
   } else if (!strncmp(arg,"--bimodal",9)) {
     bpType = BIMODAL;
+    if (sscanf(arg + 9, ":%d", &bhistoryBits) != 1) {
+        bhistoryBits = 12;
+    }
   } else if (!strncmp(arg,"--gshare:",9)) {
     bpType = GSHARE;
     sscanf(arg+9,"%d", &ghistoryBits);
@@ -123,7 +126,7 @@ main(int argc, char *argv[])
       mispredictions++;
     }
     if (verbose != 0) {
-      printf ("%d\n", prediction);
+      printf ("0x%x    %d\n", pc, prediction);
     }
 
     // Train the predictor
@@ -137,6 +140,7 @@ main(int argc, char *argv[])
   printf("Misprediction Rate: %7.3f\n", mispredict_rate);
 
   // Cleanup
+  cleanup_predictor();
   fclose(stream);
   free(buf);
 

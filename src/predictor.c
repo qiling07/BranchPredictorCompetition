@@ -5,15 +5,17 @@
 //  Implement the various branch predictors below as      //
 //  described in the README                               //
 //========================================================//
+#include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "predictor.h"
 
 //
 // TODO:Student Information
 //
-const char *studentName = "NAME";
-const char *studentID   = "PID";
-const char *email       = "EMAIL";
+const char *studentName = "Qi Ling";
+const char *studentID   = "037771523";
+const char *email       = "ling102@purdue.edu";
 
 //------------------------------------//
 //      Predictor Configuration       //
@@ -37,6 +39,62 @@ int verbose;
 //
 //TODO: Add your own Branch Predictor data structures here
 //
+#define false 0
+#define true 1
+#define ST 3 // Strongly Taken (11)
+#define WT 2 // Weakly Taken (10)
+#define WN 1 // Weakly Not Taken (01)
+#define SN 0 // Strongly Not Taken (00)
+
+// bimodal branch predictor with 2-bit saturation counters
+uint8_t *bht;                   // Branch History Table (2-bit counters)
+uint32_t bht_size;              // Size of the Branch History Table
+void
+init_bimodal()
+{
+    bht_size = 1 << bhistoryBits;      // Calculate the size of the BHT as 2^bhistoryBits
+    bht = (uint8_t *)malloc(bht_size * sizeof(uint8_t));
+
+    // Initialize all counters in the BHT to Weakly Taken (10)
+    for (uint32_t i = 0; i < bht_size; i++) {
+        bht[i] = WN;
+    }
+}
+
+uint8_t
+predict_bimodal(uint32_t pc)
+{
+    uint32_t index = pc & (bht_size - 1); // Use the lower bits of PC to index into the BHT
+    uint8_t counter = bht[index];
+
+    // Predict taken if the counter is in state WT or ST
+    return (counter >= WT) ? 1 : 0; // 1 for taken, 0 for not taken
+}
+
+void
+train_bimodal(uint32_t pc, uint8_t outcome)
+{
+    uint32_t index = pc & (bht_size - 1); // Use the lower bits of PC to index into the BHT
+    uint8_t counter = bht[index];
+
+    // Update the 2-bit saturating counter based on the actual outcome
+    if (outcome == 1) { // If the actual outcome is taken
+        if (counter < ST) {
+            bht[index]++; // Increment the counter towards Strongly Taken (ST)
+        }
+    } else { // If the actual outcome is not taken
+        if (counter > SN) {
+            bht[index]--; // Decrement the counter towards Strongly Not Taken (SN)
+        }
+    }
+}
+
+void cleanup_bimodal()
+{
+    assert(bht != NULL);
+    free(bht);
+    bht = NULL;
+}
 
 
 //------------------------------------//
@@ -53,12 +111,15 @@ init_predictor()
   //
   switch (bpType) {
     case STATIC:
+	    break;
     case BIMODAL:
+	    init_bimodal();
+	    break;
     case GSHARE:
     case TOURNAMENT:
     case CUSTOM:
     default:
-      break;
+	    assert(false && "Not implemented");
   }
 }
 
@@ -78,11 +139,12 @@ make_prediction(uint32_t pc)
     case STATIC:
       return TAKEN;
     case BIMODAL:
+      return predict_bimodal(pc);
     case GSHARE:
     case TOURNAMENT:
     case CUSTOM:
     default:
-      break;
+	    assert(false && "Not implemented");
   }
 
   // If there is not a compatable bpType then return NOTTAKEN
@@ -99,4 +161,33 @@ train_predictor(uint32_t pc, uint8_t outcome)
   //
   //TODO: Implement Predictor training
   //
+  switch (bpType) {
+    case STATIC:
+      break;
+    case BIMODAL:
+      train_bimodal(pc, outcome);
+      break;
+    case GSHARE:
+    case TOURNAMENT:
+    case CUSTOM:
+    default:
+	    assert(false && "Not implemented");
+  }
+}
+
+void
+cleanup_predictor()
+{
+  switch (bpType) {
+    case STATIC:
+      break;
+    case BIMODAL:
+      cleanup_bimodal();
+      break;
+    case GSHARE:
+    case TOURNAMENT:
+    case CUSTOM:
+    default:
+	    assert(false && "Not implemented");
+  }
 }
