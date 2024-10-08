@@ -175,9 +175,9 @@ One modification is made to the gshare BP. Instead setting `ghistoryBits = bhist
 
 To select between the tournament BP and the gshare BP, I use a chooser PHT, which is indexed with the low 12-bit of a PC address. Each entry contains a two-bit saturation counter, voting for either the tournament BP or the gshare BP.
 
-The custom BP has a total size of 64Kb. For the tournament BP, the global PHT a size of $2^12 * 2$ bits, and the chooser PHT has a size of $2^12 * 2$ bits. The local BHT has a size of $2^11 * 12$ bits, and the local PHT has a size of $2^12 * 2$ bits. For the gshare BP, the PHT has a size of $2^12 * 2$, and the top level chooser PHT has a size of $2^12 * 2$ bits. These sum up to exactly $2^16$ bits. Moreover, one GHR is needed for both the tournament and the gshare BPs, which is 12-bit long.
+The custom BP has a total size of 64Kb. For the tournament BP, the global PHT a size of $2^{12} * 2$ bits, and the chooser PHT has a size of $2^{12} * 2$ bits. The local BHT has a size of $2^{11} * 12$ bits, and the local PHT has a size of $2^{12} * 2$ bits. For the gshare BP, the PHT has a size of $2^{12} * 2$, and the top level chooser PHT has a size of $2^{12} * 2$ bits. These sum up to exactly $2^{16}$ bits. Moreover, one GHR is needed for both the tournament and the gshare BPs, which is 12-bit long.
 
-A performance comparison between different BPs of the same size (64Kb) is shown below. On average, the custom BP improves the performance of the bimodal-15 BP by 57.39%.
+A performance comparison between different BPs of the same size (64Kb) is shown below. On average, the custom BP outperforms the bimodal-15 BP by 57.39%, the gshare-15 BP by 28.87%, and the tournament BP by 23.77%.
 ![Performance Comparison](performance-comparison.png)
 
 ### Bimodal Performance Test
