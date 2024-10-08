@@ -171,7 +171,10 @@ Configuration:
     pcIndexBits = 11     // Indicates the number of bits used to index the PHT
 ```
 
-One modification is made to the gshare BP. Instead setting `ghistoryBits = bhistoryBits`, I use `ghistoryBits = 3` with `bhistoryBits = 12`. When performing XOR between the GHR and PC, I left shift the GHR to XOR the high bits of the target PC. This is to avoid branch aliasing introduced by this XOR operation, especially among close branches.
+One modification is made to the gshare BP. Instead setting `ghistoryBits = bhistoryBits`, I use `ghistoryBits = 3` with `bhistoryBits = 12`. When performing XOR between the GHR and PC, I left shift the GHR to XOR the high bits of the target PC. This is to avoid branch aliasing introduced by this XOR operation, especially among close branches. A performance comparison is shown below:
+![Performance Comparison](performance-comparison.png)
 
+### Bimodal Performance Test
 ![Bimodal Performance](bimodal_test/bimodal_test_results.png)
+### gshare Performance Test
 ![gshare Performance](gshare_test/gshare_test_results.png)

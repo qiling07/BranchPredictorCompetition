@@ -29,21 +29,21 @@ do
     # Loop through the specified range of history lengths
     for ((historyLen=$START_HISTORY; historyLen<=$END_HISTORY; historyLen++))
     do
-        echo "Testing $TESTCASE with --gshare:$historyLen ..."
+        # echo "Testing $TESTCASE with --gshare:$historyLen ..."
         
         # Run the predictor command and extract the misprediction rate
-        misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --bimodal:15 | grep "Misprediction Rate" | awk '{print $3}')
+        # misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --bimodal:15 | grep "Misprediction Rate" | awk '{print $3}')
         # misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --gshare:$historyLen | grep "Misprediction Rate" | awk '{print $3}')
         # misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --gshare:15 | grep "Misprediction Rate" | awk '{print $3}')
-        # misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --tournament:12:10:12 | grep "Misprediction Rate" | awk '{print $3}')
-        # misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --custom | grep "Misprediction Rate" | awk '{print $3}')
+        # misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --tournament:12:11:12 | grep "Misprediction Rate" | awk '{print $3}')
+        misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --custom | grep "Misprediction Rate" | awk '{print $3}')
         
         # Print the result to the console
-        echo "Trace: $TESTCASE, History Bits: $historyLen, Misprediction Rate: $misp_rate%"
+        echo "Trace: $TESTCASE, BP: custom, Misprediction Rate: $misp_rate%"
 
         # Write the result to the output file
         echo "$TESTCASE,$historyLen,$misp_rate" >> "$OUTPUT_FILE"
     done
 done
 
-echo "Testing completed. Results saved to $OUTPUT_FILE."
+# echo "Testing completed. Results saved to $OUTPUT_FILE."
