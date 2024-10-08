@@ -158,6 +158,20 @@ Due date is October 10, 11:59 pm. There will be a Brightspace submission page fo
 
 
 ## Results
-bimodal: 12/14
-gshare: 17/18
-tournament: 12:10:10
+I test the performance of bimodal and gshare with increasing history bits. I only test a few configurations of the tournament BP and my custom BP, under the hardware limit of 64Kb. Based on the testing results shown below, we can draw several conclusions:
+ - 10~12 bits PC offset is sufficient to avoid most branch aliasing.
+ - gshare performs better than bimodal under the same hardware limit.
+ - tournament performs better than gshare on most traces under the same hardware limit.
+
+With the observations above, I design a new BP as a combination of gshare and tournament. The tournament BP has the following configuration:
+```
+Configuration:
+    ghistoryBits = 12    // Indicates the length of Global History kept
+    lhistoryBits = 12    // Indicates the length of Local History kept in the PHT
+    pcIndexBits = 11     // Indicates the number of bits used to index the PHT
+```
+
+One modification is made to the gshare BP. Instead setting `ghistoryBits = bhistoryBits`, I use `ghistoryBits = 3` with `bhistoryBits = 12`. When performing XOR between the GHR and PC, I left shift the GHR to XOR the high bits of the target PC. This is to avoid branch aliasing introduced by this XOR operation, especially among close branches.
+
+![Bimodal Performance](bimodal_test/bimodal_test_results.png)
+![gshare Performance](gshare_test/gshare_test_results.png)
