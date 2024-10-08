@@ -32,8 +32,10 @@ do
         echo "Testing $TESTCASE with --gshare:$historyLen ..."
         
         # Run the predictor command and extract the misprediction rate
+        misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --bimodal:15 | grep "Misprediction Rate" | awk '{print $3}')
         # misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --gshare:$historyLen | grep "Misprediction Rate" | awk '{print $3}')
-        misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --tournament:12:10:12 | grep "Misprediction Rate" | awk '{print $3}')
+        # misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --gshare:15 | grep "Misprediction Rate" | awk '{print $3}')
+        # misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --tournament:12:10:12 | grep "Misprediction Rate" | awk '{print $3}')
         # misp_rate=$(bunzip2 -kc "$TRACE_FILE" | "$PREDICTOR" --custom | grep "Misprediction Rate" | awk '{print $3}')
         
         # Print the result to the console

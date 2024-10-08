@@ -115,7 +115,7 @@ uint8_t
 predict_gshare(uint32_t pc)
 {
     // XOR the global history register with the lower bits of the PC
-    uint32_t index = (pc ^ ghr_gshare) & (bht_size_gshare - 1);  // Ensure we index within the BHT bounds
+    uint32_t index = (pc ^ (ghr_gshare)) & (bht_size_gshare - 1);  // Ensure we index within the BHT bounds
     uint8_t counter = bht_gshare[index];
 
     // Predict taken if the counter is in state WT or ST
@@ -126,7 +126,7 @@ void
 train_gshare(uint32_t pc, uint8_t outcome)
 {
     // XOR the global history register with the lower bits of the PC
-    uint32_t index = (pc ^ ghr_gshare) & (bht_size_gshare - 1);  // Ensure we index within the BHT bounds
+    uint32_t index = (pc ^ (ghr_gshare)) & (bht_size_gshare - 1);  // Ensure we index within the BHT bounds
     uint8_t counter = bht_gshare[index];
 
     // Update the 2-bit saturating counter based on the actual outcome
@@ -150,6 +150,67 @@ cleanup_gshare()
     assert(bht_gshare != NULL);
     free(bht_gshare);
     bht_gshare = NULL;
+}
+
+// Gshare branch predictor with 2-bit saturation counters
+uint8_t *bht_gshare2;            // Branch History Table (2-bit counters) for Gshare
+uint32_t bht_size_gshare2;       // Size of the Branch History Table for Gshare
+uint32_t ghr_gshare2 = 0;        // Global History Register for Gshare
+
+void
+init_gshare2()
+{
+    bht_size_gshare2 = 1 << 12;     // Calculate the size of the BHT as 2^ghistoryBits
+    bht_gshare2 = (uint8_t *)malloc(bht_size_gshare2 * sizeof(uint8_t));
+
+    // Initialize all counters in the BHT to Weakly Taken (10)
+    for (uint32_t i = 0; i < bht_size_gshare2; i++) {
+        bht_gshare2[i] = WN;
+    }
+
+    // Initialize the GHR to zero
+    ghr_gshare2 = 0;
+}
+
+uint8_t
+predict_gshare2(uint32_t pc)
+{
+    // XOR the global history register with the lower bits of the PC
+    uint32_t index = (pc ^ (ghr_gshare2 << 9)) & (bht_size_gshare2 - 1);  // Ensure we index within the BHT bounds
+    uint8_t counter = bht_gshare2[index];
+
+    // Predict taken if the counter is in state WT or ST
+    return (counter >= WT) ? 1 : 0; // 1 for taken, 0 for not taken
+}
+
+void
+train_gshare2(uint32_t pc, uint8_t outcome)
+{
+    // XOR the global history register with the lower bits of the PC
+    uint32_t index = (pc ^ (ghr_gshare2 << 9)) & (bht_size_gshare2 - 1);  // Ensure we index within the BHT bounds
+    uint8_t counter = bht_gshare2[index];
+
+    // Update the 2-bit saturating counter based on the actual outcome
+    if (outcome == 1) { // If the actual outcome is taken
+        if (counter < ST) {
+            bht_gshare2[index]++; // Increment the counter towards Strongly Taken (ST)
+        }
+    } else { // If the actual outcome is not taken
+        if (counter > SN) {
+            bht_gshare2[index]--; // Decrement the counter towards Strongly Not Taken (SN)
+        }
+    }
+
+    // Update the Global History Register (shift left and add the new outcome)
+    ghr_gshare2 = ((ghr_gshare2 << 1) | outcome) & (bht_size_gshare2 - 1);  // Keep only ghistoryBits bits
+}
+
+void
+cleanup_gshare2()
+{
+    assert(bht_gshare2 != NULL);
+    free(bht_gshare2);
+    bht_gshare2 = NULL;
 }
 
 // tournament branch predictor with 2-bit saturation counters
@@ -267,121 +328,84 @@ cleanup_tournament()
     free(choice_pht_tournament);
 }
 
-// Custom TAGE predictor
-int ghistoryBits_tage;    // Number of bits for global history
-int num_tables_tage;      // Number of tagged tables
-int base_predictor_size;  // Size of the base predictor
+// hybrid branch predictor 
+uint8_t *choice_pht_hybrid;  // Choice predictor to choose between global and local
+uint32_t ghr_hybrid;         // Global History Register for tournament
 
-uint8_t *base_predictor_tage;     // Base predictor (bimodal)
-uint8_t **tage_tables;            // Tagged predictor tables (multiple)
-uint32_t *table_tags;             // Tags associated with each entry in the tagged tables
-uint32_t ghr_tage;                // Global History Register for TAGE predictor
-int *history_lengths;             // Array of history lengths for each table
-int tage_table_sizes;             // Size of each TAGE table
+// Sizes for the tables
+uint32_t choice_pht_size_hybrid;
 
-void init_tage()
+void
+init_hybrid()
 {
-    ghistoryBits_tage = 32;
-    num_tables_tage = 8;
+    ghistoryBits = 12;
+    lhistoryBits = 12;
+    pcIndexBits = 11;
 
-    // Allocate memory for the base predictor (bimodal) with 2-bit counters
-    base_predictor_size = 1 << ghistoryBits_tage;
-    base_predictor_tage = (uint8_t *)malloc(base_predictor_size * sizeof(uint8_t));
-    for (uint32_t i = 0; i < base_predictor_size; i++) {
-        base_predictor_tage[i] = WN; // Weakly Not Taken
+    // Initialize sizes for the tables based on the configuration parameters
+    choice_pht_size_hybrid = 1 << 12;
+
+    choice_pht_hybrid = (uint8_t *)malloc(choice_pht_size_hybrid * sizeof(uint8_t));
+
+    // Initialize all entries in the tables to their default states
+    for (uint32_t i = 0; i < choice_pht_size_hybrid; i++) {
+        choice_pht_hybrid[i] = SN;
     }
 
-    // Initialize the number of tables and each table's size
-    tage_table_sizes = 1 << ghistoryBits_tage;
-    tage_tables = (uint8_t **)malloc(num_tables_tage * sizeof(uint8_t *));
-    table_tags = (uint32_t *)malloc(num_tables_tage * tage_table_sizes * sizeof(uint32_t));
-    history_lengths = (int *)malloc(num_tables_tage * sizeof(int));
+    // Initialize the global history register to zero
+    ghr_hybrid = 0;
 
-    // Set up each tagged table with its own 2-bit counters and tags
-    for (int i = 0; i < num_tables_tage; i++) {
-        tage_tables[i] = (uint8_t *)malloc(tage_table_sizes * sizeof(uint8_t));
-        history_lengths[i] = 1 << (i + 2);  // Geometrically increasing history lengths
-
-        for (uint32_t j = 0; j < tage_table_sizes; j++) {
-            tage_tables[i][j] = WN; // Weakly Not Taken
-            table_tags[i * tage_table_sizes + j] = 0; // Initialize tags to 0
-        }
-    }
-
-    // Initialize the Global History Register (GHR) for TAGE predictor
-    ghr_tage = 0;
+    init_tournament();
+    init_gshare2();
 }
 
-uint8_t predict_tage(uint32_t pc)
+uint8_t
+predict_hybrid(uint32_t pc)
 {
-    uint8_t prediction = (base_predictor_tage[pc % base_predictor_size] >= WT) ? 1 : 0;
+    uint32_t choice_index = pc & (choice_pht_size_hybrid - 1);
 
-    // Iterate through tagged tables to find the longest matching history
-    for (int i = num_tables_tage - 1; i >= 0; i--) {
-        uint32_t index = (pc ^ (ghr_tage & ((1 << history_lengths[i]) - 1))) % tage_table_sizes;
-        uint32_t tag = table_tags[i * tage_table_sizes + index];
+    uint8_t tournament_prediction = predict_tournament(pc);
+    uint8_t gshare_prediction = predict_gshare2(pc);
+    uint8_t choice = choice_pht_hybrid[choice_index];
 
-        // If a matching tag is found, use the tagged table's prediction
-        if (tag == (pc % tage_table_sizes)) {
-            prediction = (tage_tables[i][index] >= WT) ? 1 : 0;
-            break; // Use the longest matching history table
-        }
-    }
-
-    return prediction;
+    // Use the choice predictor to select between local and global predictions
+    return (choice >= WT) ? gshare_prediction : tournament_prediction;
 }
 
-void train_tage(uint32_t pc, uint8_t outcome)
+void
+train_hybrid(uint32_t pc, uint8_t outcome)
 {
-    int longest_match = -1;
-    uint8_t base_prediction = (base_predictor_tage[pc % base_predictor_size] >= WT) ? 1 : 0;
+    uint32_t choice_index = pc & (choice_pht_size_hybrid - 1);
 
-    // Find the longest matching history in the tagged tables
-    for (int i = num_tables_tage - 1; i >= 0; i--) {
-        uint32_t index = (pc ^ (ghr_tage & ((1 << history_lengths[i]) - 1))) % tage_table_sizes;
-        uint32_t tag = table_tags[i * tage_table_sizes + index];
+    // Get current predictions
+    uint8_t tournament_prediction = predict_tournament(pc);
+    uint8_t gshare_prediction = predict_gshare2(pc);
 
-        if (tag == (pc % tage_table_sizes)) {
-            longest_match = i;
-            break;
-        }
-    }
-
-    // Update the tagged table with the longest matching history if a match was found
-    if (longest_match != -1) {
-        uint32_t index = (pc ^ (ghr_tage & ((1 << history_lengths[longest_match]) - 1))) % tage_table_sizes;
-        if (outcome == 1) {
-            if (tage_tables[longest_match][index] < ST) tage_tables[longest_match][index]++;
+    // Update the choice predictor based on which prediction was correct
+    if (tournament_prediction != gshare_prediction) {
+        if (tournament_prediction == outcome) {
+            if (choice_pht_hybrid[choice_index] > SN) choice_pht_hybrid[choice_index]--;
         } else {
-            if (tage_tables[longest_match][index] > SN) tage_tables[longest_match][index]--;
-        }
-    } else {
-        // If no match was found, update the base predictor instead
-        uint32_t base_index = pc % base_predictor_size;
-        if (outcome == 1) {
-            if (base_predictor_tage[base_index] < ST) base_predictor_tage[base_index]++;
-        } else {
-            if (base_predictor_tage[base_index] > SN) base_predictor_tage[base_index]--;
+            if (choice_pht_hybrid[choice_index] < ST) choice_pht_hybrid[choice_index]++;
         }
     }
 
-    // Update the Global History Register (GHR) with the actual outcome
-    ghr_tage = ((ghr_tage << 1) | outcome) & ((1 << ghistoryBits_tage) - 1);
+    // Update the local history table and the global history register
+    ghr_hybrid= ((ghr_hybrid << 1) | outcome) & ((1 << ghistoryBits) - 1);
+
+    train_tournament(pc, outcome);
+    train_gshare2(pc, outcome);
 }
 
-void cleanup_tage()
+void
+cleanup_hybrid()
 {
-    free(base_predictor_tage);
-    for (int i = 0; i < num_tables_tage; i++) {
-        free(tage_tables[i]);
-    }
-    free(tage_tables);
-    free(table_tags);
-    free(history_lengths);
+	cleanup_tournament();
+	cleanup_gshare2();
+	free(choice_pht_hybrid);
 }
 
-
-// Custom TAGE predictor
+// Custom Perceptron predictor
 int ghistoryBits_perceptron;   // Number of bits for global history
 int num_perceptrons;           // Number of perceptrons in the table
 int perceptron_threshold;      // Threshold for training the perceptrons
@@ -488,7 +512,8 @@ init_predictor()
 	    break;
     case CUSTOM:
 	    // init_tage();
-	    init_perceptron();
+	    // init_perceptron();
+	    init_hybrid();
 	    break;
     default:
 	    assert(false && "Not implemented");
@@ -514,7 +539,8 @@ make_prediction(uint32_t pc)
       return predict_tournament(pc);
     case CUSTOM:
       // return predict_tage(pc);
-      return predict_perceptron(pc);
+      // return predict_perceptron(pc);
+      return predict_hybrid(pc);
     default:
 	    assert(false && "Not implemented");
   }
@@ -544,7 +570,8 @@ train_predictor(uint32_t pc, uint8_t outcome)
       break;
     case CUSTOM:
       // train_tage(pc, outcome);
-      train_perceptron(pc, outcome);
+      // train_perceptron(pc, outcome);
+      train_hybrid(pc, outcome);
       break;
     default:
 	    assert(false && "Not implemented");
@@ -568,7 +595,8 @@ cleanup_predictor()
       break;
     case CUSTOM:
       // cleanup_tage();
-      cleanup_perceptron();
+      // cleanup_perceptron();
+      cleanup_hybrid();
       break;
     default:
 	    assert(false && "Not implemented");
